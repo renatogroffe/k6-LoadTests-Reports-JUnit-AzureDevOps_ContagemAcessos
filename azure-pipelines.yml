@@ -1,0 +1,69 @@
+trigger:
+- main
+
+variables:
+  loadTestsScript: 'loadtests-http-contagem.js'
+  htmtReportK6: 'loadtests.html'
+  testsDirectory: './Tests'
+
+  # Agent VM image name
+  vmImageName: 'ubuntu-latest'
+
+stages:
+- stage: Tests
+  displayName: Tests stage
+  variables:
+    - group: http-configurations
+  jobs:
+  - job: Tests
+    displayName: Tests
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: replacetokens@5
+      inputs:
+        targetFiles: '$(testsDirectory)/$(loadTestsScript)'
+        encoding: 'auto'
+        tokenPattern: 'default'
+        writeBOM: true
+        actionOnMissing: 'warn'
+        keepToken: false
+        actionOnNoFiles: 'continue'
+        enableTransforms: false
+        enableRecursion: false
+        useLegacyPattern: false
+        defaultValue: '$(urlWebApp)'
+        enableTelemetry: true
+      displayName: Configurar a string de conexão do SQL Server no script de testes
+    - script: |
+        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+        echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+        sudo apt-get update
+        sudo apt-get install k6
+        k6
+      displayName: Instalar o k6
+    - script: |
+        cd $(testsDirectory)
+        ls
+        cat $(loadTestsScript)
+        k6 run $(loadTestsScript) --vus $(simultaneousUsers) --iterations $(totalRequests)
+      displayName: Executar os testes de carga com k6
+    - script: |
+        echo '** Arquivos/diretórios após a execução dos testes e a partir da raiz:'
+        echo ' '
+        echo ' '
+        ls
+      displayName: Listar arquivos e diretórios na pasta ./Tests
+      condition: always()
+    - task: PublishTestResults@2
+      condition: always()
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/Tests/*.xml'
+        searchFolder: '$(Build.SourcesDirectory)'
+      displayName: Publicar sumário dos testes com base no XML gerado
+    - task: PublishHtmlReport@1
+      condition: always()
+      inputs:
+        reportDir: '$(testsDirectory)/$(htmtReportK6)'
+      displayName: Publicar relatório com os resultados dos testes
