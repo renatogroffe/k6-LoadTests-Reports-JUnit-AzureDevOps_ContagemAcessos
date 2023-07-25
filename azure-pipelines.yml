@@ -34,24 +34,26 @@ stages:
         useLegacyPattern: false
         defaultValue: '$(urlWebApp)'
         enableTelemetry: true
-      displayName: Configurar a string de conexão do SQL Server no script de testes
+      displayName: Configurar o endpoint par envio de requisições no script de testes
     - script: |
-        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
-        echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+        cd $(testsDirectory)
+        cat $(loadTestsScript)
+      displayName: Exibir conteúdo do script de testes após ajustes
+    - script: |
+        sudo gpg -k
+        sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+        echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
         sudo apt-get update
         sudo apt-get install k6
         k6
       displayName: Instalar o k6
     - script: |
         cd $(testsDirectory)
-        ls
-        cat $(loadTestsScript)
         k6 run $(loadTestsScript) --vus $(simultaneousUsers) --iterations $(totalRequests)
       displayName: Executar os testes de carga com k6
     - script: |
-        echo '** Arquivos/diretórios após a execução dos testes e a partir da raiz:'
-        echo ' '
-        echo ' '
+        echo '** Arquivos/diretórios após a execução dos testes --> $(testsDirectory)'
+        cd $(testsDirectory)
         ls
       displayName: Listar arquivos e diretórios na pasta ./Tests
       condition: always()
